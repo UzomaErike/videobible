@@ -304,12 +304,42 @@ function openBook(bookId) {
 // ── VIDEOS ───────────────────────────────────────────────────────
 function openChapter(ch) {
   currentChapter = ch;
-  document.getElementById('bc-chapter').textContent    = 'Chapter ' + ch;
-  document.getElementById('videoPageTitle').textContent = currentBook.name + ' — Chapter ' + ch;
-  document.getElementById('videoPageSub').textContent   =
+  document.getElementById('bc-chapter').textContent     = 'Chapter ' + ch;
+  document.getElementById('videoPageTitle').textContent  = currentBook.name + ' — Chapter ' + ch;
+  document.getElementById('videoPageSub').textContent    =
     (currentBook.testament === 'OT' ? 'Old' : 'New') + ' Testament · ' + currentBook.genre;
+  updateChapterNav(ch);
   showPage('page-videos');
   loadChapterVideos(currentBook.id, ch);
+}
+
+function updateChapterNav(ch) {
+  const total   = currentBook.chapters;
+  const hasPrev = ch > 1;
+  const hasNext = ch < total;
+
+  const prevBtn = document.getElementById('navPrev');
+  const nextBtn = document.getElementById('navNext');
+
+  // Previous button
+  if (hasPrev) {
+    prevBtn.style.display = 'flex';
+    prevBtn.querySelector('.nav-label').textContent = 'Previous';
+    prevBtn.querySelector('.nav-chapter').textContent = 'Chapter ' + (ch - 1);
+    prevBtn.onclick = () => openChapter(ch - 1);
+  } else {
+    prevBtn.style.display = 'none';
+  }
+
+  // Next button
+  if (hasNext) {
+    nextBtn.style.display = 'flex';
+    nextBtn.querySelector('.nav-label').textContent = 'Next';
+    nextBtn.querySelector('.nav-chapter').textContent = 'Chapter ' + (ch + 1);
+    nextBtn.onclick = () => openChapter(ch + 1);
+  } else {
+    nextBtn.style.display = 'none';
+  }
 }
 
 // ── SEARCH ───────────────────────────────────────────────────────
@@ -462,6 +492,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   .si-name{font-family:'Cinzel',serif;font-size:.95rem;color:var(--text);margin-bottom:.2rem;}
   .si-meta{font-size:.75rem;color:var(--text3);}
 
+  /* CHAPTER NAV */
+  .chapter-nav{display:flex;gap:1rem;margin-top:3rem;padding-top:2rem;border-top:1px solid var(--border);}
+  .nav-btn{flex:1;display:none;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.5rem;cursor:pointer;transition:all .25s;text-align:left;}
+  .nav-btn:last-child{text-align:right;}
+  .nav-btn:hover{border-color:var(--border2);background:var(--navy3);transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,.35);}
+  .nav-label{font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.15em;margin-bottom:.3rem;font-family:'Cinzel',serif;}
+  .nav-chapter{font-family:'Cinzel',serif;font-size:1.05rem;color:var(--text);font-weight:600;}
+  .nav-btn:hover .nav-chapter{color:var(--gold);}
+  @media(max-width:480px){.chapter-nav{flex-direction:column;}.nav-btn:last-child{text-align:left;}}
+
   ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}::-webkit-scrollbar-thumb:hover{background:var(--gold-dk);}
 
   @media(max-width:600px){
@@ -557,6 +597,18 @@ window.addEventListener('DOMContentLoaded', async () => {
       <div id="videoPageSub">—</div>
     </div>
     <div class="videos-grid" id="videosGrid"></div>
+
+    <!-- Previous / Next chapter navigation -->
+    <div class="chapter-nav">
+      <button class="nav-btn" id="navPrev">
+        <span class="nav-label">Previous</span>
+        <span class="nav-chapter"></span>
+      </button>
+      <button class="nav-btn" id="navNext">
+        <span class="nav-label">Next</span>
+        <span class="nav-chapter"></span>
+      </button>
+    </div>
   </div>
 </div>
 
