@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VideoBible — The Living Word in Motion</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=Lato:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
+
+<script>
+// ================================================================
+//  TURSO CONFIG  —  paste your values here
+//  See setup guide in VideoBible-Admin.html
+// ================================================================
+const TURSO_URL   = "https://videobible-wealthypriest.aws-us-west-2.turso.io";
+  // e.g.  "https://videobible-yourname.turso.io"
+
+const TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicm8iLCJpYXQiOjE3NzUzNzAzMjIsImlkIjoiMDE5ZDVjM2MtNjQwMS03NTZlLWEyYzctNTM1NTFkYjBjNGY2IiwicmlkIjoiM2MwNmQxOTgtM2U0Mi00NzExLWJkYmYtOGQ4Yjc3ZGQzZDU3In0.U05x3F1n_-2OkA6ERxDh8x6Hdo7K6ljeJSFFXdHgMtLP1aS8OeIunNyRn8owanXcinCWlJ5rKF0C-khLP3CkBQ";
+  // Create a read-only token:
+  //   turso db tokens create videobible --read-only
+  // OR copy the full token from the Turso dashboard (Settings → Tokens)
+// ================================================================
+
+const CONFIGURED = !TURSO_URL.includes("PASTE") && !TURSO_TOKEN.includes("PASTE");
+
+// ── TURSO QUERY HELPER ───────────────────────────────────────────
+async function tursoQuery(sql, args = []) {
+  const res = await fetch(TURSO_URL + "/v2/pipeline", {
+    method:  "POST",
+    headers: {
+      "Authorization": "Bearer " + TURSO_TOKEN,
+      "Content-Type":  "application/json"
+    },
+    body: JSON.stringify({
+      requests: [
+        { type: "execute", stmt: { sql, args } },
+        { type: "close" }
+      ]
+    })
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error("HTTP " + res.status + ": " + txt);
+  }
+
+  const data  = await res.json();
+  const first = data.results && data.results[0];
+
+  if (!first || first.type === "error") {
+    throw new Error(first?.error?.message || "Unknown Turso error");
+  }
+
+  // Convert column/row format → array of plain objects
+  const result = first.response.result;
+  const cols   = result.cols.map(c => c.name);
+  return result.rows.map(row =>
+    Object.fromEntries(cols.map((col, i) => [col, row[i]?.value ?? row[i]]))
+  );
+}
+
+// ── BIBLE DATA ───────────────────────────────────────────────────
+const BIBLE = [
+  { id:'GEN', name:'Genesis',         testament:'OT', chapters:50,  icon:'🌍', genre:'Law' },
+  { id:'EXO', name:'Exodus',          testament:'OT', chapters:40,  icon:'🔥', genre:'Law' },
+  { id:'LEV', name:'Leviticus',       testament:'OT', chapters:27,  icon:'📜', genre:'Law' },
+  { id:'NUM', name:'Numbers',         testament:'OT', chapters:36,  icon:'🏕️', genre:'Law' },
+  { id:'DEU', name:'Deuteronomy',     testament:'OT', chapters:34,  icon:'📖', genre:'Law' },
+  { id:'JOS', name:'Joshua',          testament:'OT', chapters:24,  icon:'⚔️', genre:'History' },
+  { id:'JDG', name:'Judges',          testament:'OT', chapters:21,  icon:'🗡️', genre:'History' },
+  { id:'RUT', name:'Ruth',            testament:'OT', chapters:4,   icon:'🌾', genre:'History' },
+  { id:'1SA', name:'1 Samuel',        testament:'OT', chapters:31,  icon:'👑', genre:'History' },
+  { id:'2SA', name:'2 Samuel',        testament:'OT', chapters:24,  icon:'👑', genre:'History' },
+  { id:'1KI', name:'1 Kings',         testament:'OT', chapters:22,  icon:'🏛️', genre:'History' },
+  { id:'2KI', name:'2 Kings',         testament:'OT', chapters:25,  icon:'🏛️', genre:'History' },
+  { id:'1CH', name:'1 Chronicles',    testament:'OT', chapters:29,  icon:'📚', genre:'History' },
+  { id:'2CH', name:'2 Chronicles',    testament:'OT', chapters:36,  icon:'📚', genre:'History' },
+  { id:'EZR', name:'Ezra',            testament:'OT', chapters:10,  icon:'✍️', genre:'History' },
+  { id:'NEH', name:'Nehemiah',        testament:'OT', chapters:13,  icon:'🧱', genre:'History' },
+  { id:'EST', name:'Esther',          testament:'OT', chapters:10,  icon:'👸', genre:'History' },
+  { id:'JOB', name:'Job',             testament:'OT', chapters:42,  icon:'🌪️', genre:'Poetry' },
+  { id:'PSA', name:'Psalms',          testament:'OT', chapters:150, icon:'🎵', genre:'Poetry' },
+  { id:'PRO', name:'Proverbs',        testament:'OT', chapters:31,  icon:'💡', genre:'Poetry' },
+  { id:'ECC', name:'Ecclesiastes',    testament:'OT', chapters:12,  icon:'🍃', genre:'Poetry' },
+  { id:'SNG', name:'Song of Solomon', testament:'OT', chapters:8,   icon:'🌹', genre:'Poetry' },
+  { id:'ISA', name:'Isaiah',          testament:'OT', chapters:66,  icon:'🕊️', genre:'Major Prophet' },
+  { id:'JER', name:'Jeremiah',        testament:'OT', chapters:52,  icon:'😢', genre:'Major Prophet' },
+  { id:'LAM', name:'Lamentations',    testament:'OT', chapters:5,   icon:'🕯️', genre:'Major Prophet' },
+  { id:'EZK', name:'Ezekiel',         testament:'OT', chapters:48,  icon:'👁️', genre:'Major Prophet' },
+  { id:'DAN', name:'Daniel',          testament:'OT', chapters:12,  icon:'🦁', genre:'Major Prophet' },
+  { id:'HOS', name:'Hosea',           testament:'OT', chapters:14,  icon:'💔', genre:'Minor Prophet' },
+  { id:'JOL', name:'Joel',            testament:'OT', chapters:3,   icon:'🌾', genre:'Minor Prophet' },
+  { id:'AMO', name:'Amos',            testament:'OT', chapters:9,   icon:'⚖️', genre:'Minor Prophet' },
+  { id:'OBA', name:'Obadiah',         testament:'OT', chapters:1,   icon:'🏔️', genre:'Minor Prophet' },
+  { id:'JON', name:'Jonah',           testament:'OT', chapters:4,   icon:'🐋', genre:'Minor Prophet' },
+  { id:'MIC', name:'Micah',           testament:'OT', chapters:7,   icon:'⚖️', genre:'Minor Prophet' },
+  { id:'NAH', name:'Nahum',           testament:'OT', chapters:3,   icon:'🏙️', genre:'Minor Prophet' },
+  { id:'HAB', name:'Habakkuk',        testament:'OT', chapters:3,   icon:'🙏', genre:'Minor Prophet' },
+  { id:'ZEP', name:'Zephaniah',       testament:'OT', chapters:3,   icon:'⚡', genre:'Minor Prophet' },
+  { id:'HAG', name:'Haggai',          testament:'OT', chapters:2,   icon:'🏗️', genre:'Minor Prophet' },
+  { id:'ZEC', name:'Zechariah',       testament:'OT', chapters:14,  icon:'🐴', genre:'Minor Prophet' },
+  { id:'MAL', name:'Malachi',         testament:'OT', chapters:4,   icon:'📨', genre:'Minor Prophet' },
+  { id:'MAT', name:'Matthew',         testament:'NT', chapters:28,  icon:'👼', genre:'Gospel' },
+  { id:'MRK', name:'Mark',            testament:'NT', chapters:16,  icon:'⚡', genre:'Gospel' },
+  { id:'LUK', name:'Luke',            testament:'NT', chapters:24,  icon:'🏥', genre:'Gospel' },
+  { id:'JHN', name:'John',            testament:'NT', chapters:21,  icon:'❤️', genre:'Gospel' },
+  { id:'ACT', name:'Acts',            testament:'NT', chapters:28,  icon:'🌍', genre:'History' },
+  { id:'ROM', name:'Romans',          testament:'NT', chapters:16,  icon:'📜', genre:'Epistle' },
+  { id:'1CO', name:'1 Corinthians',   testament:'NT', chapters:16,  icon:'🏛️', genre:'Epistle' },
+  { id:'2CO', name:'2 Corinthians',   testament:'NT', chapters:13,  icon:'🏛️', genre:'Epistle' },
+  { id:'GAL', name:'Galatians',       testament:'NT', chapters:6,   icon:'⛓️', genre:'Epistle' },
+  { id:'EPH', name:'Ephesians',       testament:'NT', chapters:6,   icon:'⚔️', genre:'Epistle' },
+  { id:'PHP', name:'Philippians',     testament:'NT', chapters:4,   icon:'😊', genre:'Epistle' },
+  { id:'COL', name:'Colossians',      testament:'NT', chapters:4,   icon:'✝️', genre:'Epistle' },
+  { id:'1TH', name:'1 Thessalonians', testament:'NT', chapters:5,   icon:'🌟', genre:'Epistle' },
+  { id:'2TH', name:'2 Thessalonians', testament:'NT', chapters:3,   icon:'🌟', genre:'Epistle' },
+  { id:'1TI', name:'1 Timothy',       testament:'NT', chapters:6,   icon:'👨‍⚕️', genre:'Epistle' },
+  { id:'2TI', name:'2 Timothy',       testament:'NT', chapters:4,   icon:'👨‍⚕️', genre:'Epistle' },
+  { id:'TIT', name:'Titus',           testament:'NT', chapters:3,   icon:'🏝️', genre:'Epistle' },
+  { id:'PHM', name:'Philemon',        testament:'NT', chapters:1,   icon:'🤝', genre:'Epistle' },
+  { id:'HEB', name:'Hebrews',         testament:'NT', chapters:13,  icon:'✡️', genre:'Epistle' },
+  { id:'JAS', name:'James',           testament:'NT', chapters:5,   icon:'🌿', genre:'Epistle' },
+  { id:'1PE', name:'1 Peter',         testament:'NT', chapters:5,   icon:'🪨', genre:'Epistle' },
+  { id:'2PE', name:'2 Peter',         testament:'NT', chapters:3,   icon:'🪨', genre:'Epistle' },
+  { id:'1JN', name:'1 John',          testament:'NT', chapters:5,   icon:'❤️', genre:'Epistle' },
+  { id:'2JN', name:'2 John',          testament:'NT', chapters:1,   icon:'✉️', genre:'Epistle' },
+  { id:'3JN', name:'3 John',          testament:'NT', chapters:1,   icon:'✉️', genre:'Epistle' },
+  { id:'JUD', name:'Jude',            testament:'NT', chapters:1,   icon:'⚠️', genre:'Epistle' },
+  { id:'REV', name:'Revelation',      testament:'NT', chapters:22,  icon:'🐉', genre:'Prophecy' },
+];
+
+// ── STATE ────────────────────────────────────────────────────────
+let currentTab     = 'OT';
+let currentBook    = null;
+let currentChapter = null;
+let bookCounts     = {};
+let globalTotal    = 0;
+
+// ── LOAD BOOK VIDEO COUNTS ───────────────────────────────────────
+async function loadAllCounts() {
+  if (!CONFIGURED) return;
+  try {
+    const rows = await tursoQuery(
+      "SELECT book_id, COUNT(*) as cnt FROM videos GROUP BY book_id"
+    );
+    bookCounts = {}; globalTotal = 0;
+    rows.forEach(r => {
+      bookCounts[r.book_id] = parseInt(r.cnt) || 0;
+      globalTotal += bookCounts[r.book_id];
+    });
+    document.getElementById('heroVideoCount').textContent = globalTotal.toLocaleString();
+  } catch(e) {
+    console.warn("loadAllCounts failed:", e.message);
+  }
+}
+
+// ── LOAD CHAPTER VIDEOS ──────────────────────────────────────────
+async function loadChapterVideos(bookId, ch) {
+  renderLoading();
+  if (!CONFIGURED) {
+    renderError("Turso is not configured yet. Open this file and fill in TURSO_URL and TURSO_TOKEN.");
+    return;
+  }
+  try {
+    const rows = await tursoQuery(
+      "SELECT yt_id, title FROM videos WHERE book_id = ? AND chapter = ? ORDER BY added ASC",
+      [
+        { type: "text",    value: bookId },
+        { type: "integer", value: String(ch) }
+      ]
+    );
+    if (rows.length === 0) renderEmpty();
+    else renderVideos(rows);
+  } catch(e) {
+    console.error("loadChapterVideos error:", e);
+    if (e.message.includes("401") || e.message.includes("Unauthorized")) {
+      renderError("⛔ Token rejected. Check your TURSO_TOKEN is correct and not expired.");
+    } else if (e.message.includes("404") || e.message.includes("not found")) {
+      renderError("⛔ Database not found. Check your TURSO_URL is correct.");
+    } else if (e.message.includes("no such table")) {
+      renderError("⛔ Table 'videos' does not exist yet.<br>Go to your Turso dashboard → Shell and run the CREATE TABLE command from the setup guide.");
+    } else {
+      renderError("Error: " + e.message);
+    }
+  }
+}
+
+// ── RENDER HELPERS ───────────────────────────────────────────────
+function renderLoading() {
+  document.getElementById('videosGrid').innerHTML = `
+    <div class="state-box">
+      <div class="spinner"></div>
+      <p>Loading videos…</p>
+    </div>`;
+}
+
+function renderEmpty() {
+  document.getElementById('videosGrid').innerHTML = `
+    <div class="state-box">
+      <div class="empty-icon">🎬</div>
+      <h3>No videos yet for this chapter</h3>
+      <p>Videos will appear here once they are added in the admin panel.</p>
+    </div>`;
+}
+
+function renderError(msg) {
+  document.getElementById('videosGrid').innerHTML = `
+    <div class="state-box error-box">
+      <div class="empty-icon">⚠️</div>
+      <h3>Could not load videos</h3>
+      <p>${msg}</p>
+    </div>`;
+}
+
+function renderVideos(rows) {
+  document.getElementById('videosGrid').innerHTML = rows.map(r => `
+    <div class="video-card">
+      <div class="video-thumb">
+        <iframe
+          src="https://www.youtube.com/embed/${esc(r.yt_id)}"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen loading="lazy"></iframe>
+      </div>
+      <div class="video-meta">
+        <div class="video-title">${esc(r.title)}</div>
+        <div class="video-src">▶ YouTube</div>
+      </div>
+    </div>`).join('');
+}
+
+// ── NAVIGATION ───────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function goHome() {
+  document.getElementById('globalSearch').value = '';
+  showPage('page-home');
+}
+
+function goToCurrentBook() { if (currentBook) openBook(currentBook.id); }
+
+// ── BOOKS ────────────────────────────────────────────────────────
+function filterTestament(t) {
+  currentTab = t;
+  ['OT','NT','ALL'].forEach(k =>
+    document.getElementById('tab-'+k).classList.toggle('active', t === k));
+  const ot   = BIBLE.filter(b => b.testament === 'OT');
+  const nt   = BIBLE.filter(b => b.testament === 'NT');
+  const grid = document.getElementById('booksGrid');
+  if (t === 'ALL') {
+    grid.innerHTML =
+      `<p class="section-label">Old Testament — ${ot.length} Books</p>
+       <div class="books-grid">${ot.map(bookCard).join('')}</div>
+       <p class="section-label" style="margin-top:2rem">New Testament — ${nt.length} Books</p>
+       <div class="books-grid">${nt.map(bookCard).join('')}</div>`;
+  } else {
+    const list  = t === 'OT' ? ot : nt;
+    const label = t === 'OT' ? 'Old Testament' : 'New Testament';
+    grid.innerHTML =
+      `<p class="section-label">${label} — ${list.length} Books</p>
+       <div class="books-grid">${list.map(bookCard).join('')}</div>`;
+  }
+  showPage('page-books');
+}
+
+function bookCard(b) {
+  const vc = bookCounts[b.id] || 0;
+  return `
+    <div class="book-card testament-${b.testament.toLowerCase()}" onclick="openBook('${b.id}')">
+      ${vc > 0 ? `<span class="book-vc">▶ ${vc}</span>` : ''}
+      <div class="book-tag tag-${b.testament.toLowerCase()}">${b.testament} · ${b.genre}</div>
+      <div class="book-icon">${b.icon}</div>
+      <div class="book-name">${b.name}</div>
+      <div class="book-chapters"><strong>${b.chapters}</strong> chapters</div>
+    </div>`;
+}
+
+// ── CHAPTERS ────────────────────────────────────────────────────
+function openBook(bookId) {
+  currentBook = BIBLE.find(b => b.id === bookId);
+  if (!currentBook) return;
+  document.getElementById('bc-book').textContent  = currentBook.name;
+  document.getElementById('bc-book2').textContent = currentBook.name;
+  document.getElementById('bookInfoBanner').innerHTML = `
+    <div class="book-info-icon">${currentBook.icon}</div>
+    <div class="book-info-text">
+      <h2>${currentBook.name}</h2>
+      <p>${currentBook.genre} · ${currentBook.testament === 'OT' ? 'Old' : 'New'} Testament · ${currentBook.chapters} chapters</p>
+    </div>`;
+  document.getElementById('chaptersGrid').innerHTML =
+    Array.from({ length: currentBook.chapters }, (_, i) => {
+      const ch = i + 1;
+      return `
+        <div class="chapter-card" onclick="openChapter(${ch})">
+          <span class="ch-num">${ch}</span>
+          <span class="ch-label">Chapter</span>
+        </div>`;
+    }).join('');
+  showPage('page-chapters');
+}
+
+// ── VIDEOS ───────────────────────────────────────────────────────
+function openChapter(ch) {
+  currentChapter = ch;
+  document.getElementById('bc-chapter').textContent    = 'Chapter ' + ch;
+  document.getElementById('videoPageTitle').textContent = currentBook.name + ' — Chapter ' + ch;
+  document.getElementById('videoPageSub').textContent   =
+    (currentBook.testament === 'OT' ? 'Old' : 'New') + ' Testament · ' + currentBook.genre;
+  showPage('page-videos');
+  loadChapterVideos(currentBook.id, ch);
+}
+
+// ── SEARCH ───────────────────────────────────────────────────────
+let searchTimer;
+function handleSearch(q) {
+  clearTimeout(searchTimer);
+  if (!q.trim()) { goHome(); return; }
+  searchTimer = setTimeout(() => {
+    const lq = q.trim().toLowerCase();
+    const results = BIBLE.filter(b =>
+      b.name.toLowerCase().includes(lq) || b.genre.toLowerCase().includes(lq));
+    document.getElementById('searchHeader').textContent =
+      results.length + ' result' + (results.length !== 1 ? 's' : '') + ' for "' + q.trim() + '"';
+    document.getElementById('searchList').innerHTML = results.length === 0
+      ? `<div class="state-box"><div class="empty-icon">🔍</div><h3>No books found</h3></div>`
+      : results.map(b => `
+          <div class="search-item" onclick="openBook('${b.id}')">
+            <span class="si-icon">${b.icon}</span>
+            <div>
+              <div class="si-name">${b.name}</div>
+              <div class="si-meta">${b.testament === 'OT' ? 'Old' : 'New'} Testament · ${b.genre} · ${b.chapters} chapters · ${bookCounts[b.id] || 0} videos</div>
+            </div>
+          </div>`).join('');
+    showPage('page-search');
+  }, 250);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── INIT ─────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  if (!CONFIGURED) document.getElementById('configBanner').style.display = 'flex';
+  await loadAllCounts();
+  filterTestament('OT');
+  document.getElementById('page-books').classList.remove('active');
+  document.getElementById('page-home').classList.add('active');
+});
+</script>
+
+<style>
+  :root {
+    --gold:    #C9A84C; --gold-lt: #E8C878; --gold-dk: #8B6914;
+    --bg:      #07090F; --navy:    #0D1117; --navy2:   #161B27;
+    --navy3:   #1E2635; --card:    #111722;
+    --border:  rgba(201,168,76,.18); --border2: rgba(201,168,76,.45);
+    --text:    #F0E8D0; --text2:   #9BA8BD; --text3:   #5A6478;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Lato',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(201,168,76,.06) 0%,transparent 60%),radial-gradient(ellipse 60% 40% at 100% 100%,rgba(139,26,32,.04) 0%,transparent 50%);pointer-events:none;z-index:0;}
+
+  #configBanner{display:none;position:fixed;top:64px;left:0;right:0;z-index:200;background:linear-gradient(90deg,#3D1A00,#5C2800);border-bottom:1px solid rgba(255,150,50,.4);padding:.7rem 1.5rem;align-items:center;gap:1rem;flex-wrap:wrap;font-size:.85rem;color:#FFD0A0;}
+  #configBanner strong{color:#FFB060;}
+
+  header{position:sticky;top:0;z-index:100;background:rgba(7,9,15,.96);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;gap:1rem;}
+  .logo{font-family:'Cinzel Decorative',serif;font-size:1.35rem;color:var(--gold);cursor:pointer;display:flex;align-items:center;gap:.4rem;flex-shrink:0;}
+  .logo span{color:var(--text);}
+  .hdr-search{display:flex;align-items:center;gap:.5rem;background:var(--navy2);border:1px solid var(--border);border-radius:8px;padding:.4rem .75rem;flex:1;max-width:320px;transition:border-color .2s;}
+  .hdr-search:focus-within{border-color:var(--gold);}
+  .hdr-search input{background:none;border:none;outline:none;color:var(--text);font-family:'Lato',sans-serif;font-size:.875rem;width:100%;}
+  .hdr-search input::placeholder{color:var(--text3);}
+
+  .page{display:none;position:relative;z-index:1;}
+  .page.active{display:block;}
+
+  /* HERO */
+  .hero{min-height:calc(100vh - 64px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4rem 2rem;}
+  .hero-cross{font-size:5rem;margin-bottom:1.5rem;animation:floatCross 5s ease-in-out infinite;filter:drop-shadow(0 0 40px rgba(201,168,76,.45));}
+  @keyframes floatCross{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+  .hero h1{font-family:'Cinzel Decorative',serif;font-size:clamp(2.5rem,7vw,5.5rem);color:var(--gold);line-height:1.1;text-shadow:0 0 80px rgba(201,168,76,.3);margin-bottom:.4rem;}
+  .hero-tag{font-family:'Cinzel',serif;font-size:clamp(.75rem,1.5vw,.95rem);color:var(--text3);letter-spacing:.4em;text-transform:uppercase;margin-bottom:2rem;}
+  .divider{width:160px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:0 auto 2rem;}
+  .hero-desc{max-width:560px;color:var(--text2);font-size:1.05rem;line-height:1.75;margin-bottom:2.5rem;font-weight:300;}
+  .hero-stats{display:flex;gap:3.5rem;margin-bottom:3rem;flex-wrap:wrap;justify-content:center;}
+  .stat .num{font-family:'Cinzel',serif;font-size:2.2rem;color:var(--gold);display:block;font-weight:700;}
+  .stat .lbl{font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.2em;}
+  .btn-hero{display:inline-flex;align-items:center;gap:.5rem;background:linear-gradient(135deg,var(--gold-dk),var(--gold));color:var(--bg);font-family:'Cinzel',serif;font-weight:700;font-size:.95rem;padding:.9rem 2.8rem;border-radius:50px;border:none;cursor:pointer;letter-spacing:.1em;text-transform:uppercase;transition:all .3s;box-shadow:0 4px 24px rgba(201,168,76,.22);}
+  .btn-hero:hover{transform:translateY(-3px);box-shadow:0 10px 35px rgba(201,168,76,.38);}
+
+  .page-head{padding:2.5rem 2rem 1rem;text-align:center;}
+  .breadcrumb{display:flex;align-items:center;gap:.4rem;justify-content:center;color:var(--text3);font-size:.8rem;margin-bottom:1.2rem;flex-wrap:wrap;}
+  .bc-link{color:var(--gold);cursor:pointer;font-family:'Cinzel',serif;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;transition:color .2s;}
+  .bc-link:hover{color:var(--gold-lt);text-decoration:underline;}
+
+  .tabs{display:flex;justify-content:center;margin-bottom:2rem;border:1px solid var(--border);border-radius:50px;overflow:hidden;width:fit-content;margin-inline:auto;}
+  .tab-btn{padding:.55rem 1.8rem;background:transparent;border:none;color:var(--text3);font-family:'Cinzel',serif;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s;}
+  .tab-btn.active{background:linear-gradient(135deg,var(--gold-dk),var(--gold));color:var(--bg);font-weight:700;}
+
+  .books-container{padding:0 2rem 4rem;max-width:1400px;margin:0 auto;}
+  .section-label{font-family:'Cinzel',serif;font-size:.65rem;color:var(--text3);letter-spacing:.3em;text-transform:uppercase;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border);}
+  .books-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:1rem;margin-bottom:2rem;}
+  .book-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.2rem 1rem;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;}
+  .book-card::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(201,168,76,.07),transparent);opacity:0;transition:opacity .25s;}
+  .book-card:hover{border-color:var(--border2);transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,0,0,.35);}
+  .book-card:hover::after{opacity:1;}
+  .book-card.testament-ot{border-left:3px solid rgba(139,105,20,.4);}
+  .book-card.testament-nt{border-left:3px solid rgba(139,26,32,.4);}
+  .book-vc{position:absolute;top:.45rem;right:.45rem;background:rgba(201,168,76,.14);border:1px solid rgba(201,168,76,.3);color:var(--gold);font-size:.6rem;font-family:'Cinzel',serif;padding:.12rem .35rem;border-radius:20px;}
+  .book-tag{font-size:.58rem;font-family:'Cinzel',serif;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.4rem;padding:.1rem .4rem;border-radius:3px;display:inline-block;}
+  .tag-ot{background:rgba(139,105,20,.15);border:1px solid rgba(139,105,20,.3);color:var(--gold-dk);}
+  .tag-nt{background:rgba(139,26,32,.12);border:1px solid rgba(139,26,32,.3);color:#B85050;}
+  .book-icon{font-size:1.5rem;margin-bottom:.4rem;}
+  .book-name{font-family:'Cinzel',serif;font-size:.9rem;color:var(--text);font-weight:600;margin-bottom:.4rem;line-height:1.3;}
+  .book-chapters{font-size:.72rem;color:var(--text3);}
+  .book-chapters strong{color:var(--gold);}
+
+  .chapters-container{padding:0 2rem 4rem;max-width:1200px;margin:0 auto;}
+  .book-banner{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.5rem 2rem;margin-bottom:2rem;display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;}
+  .book-info-icon{font-size:2.5rem;}
+  .book-info-text h2{font-family:'Cinzel',serif;font-size:1.5rem;color:var(--gold);margin-bottom:.25rem;}
+  .book-info-text p{color:var(--text2);font-size:.9rem;}
+  .chapters-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:.7rem;}
+  .chapter-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem .5rem;text-align:center;cursor:pointer;transition:all .2s;}
+  .chapter-card:hover{border-color:var(--border2);background:var(--navy3);transform:translateY(-2px);}
+  .ch-num{font-family:'Cinzel',serif;font-size:1.3rem;color:var(--text);font-weight:700;display:block;margin-bottom:.2rem;}
+  .ch-label{font-size:.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;}
+
+  .videos-container{padding:0 2rem 4rem;max-width:1400px;margin:0 auto;}
+  .chapter-header{margin-bottom:1.5rem;}
+  #videoPageTitle{font-family:'Cinzel',serif;font-size:1.6rem;color:var(--gold);}
+  #videoPageSub{color:var(--text2);font-size:.9rem;margin-top:.2rem;}
+  .videos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:1.5rem;margin-top:1.5rem;}
+  .video-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:all .25s;}
+  .video-card:hover{border-color:var(--border2);transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.4);}
+  .video-thumb{position:relative;padding-top:56.25%;background:var(--navy3);}
+  .video-thumb iframe{position:absolute;inset:0;width:100%;height:100%;border:none;}
+  .video-meta{padding:1rem 1.2rem;}
+  .video-title{font-family:'Cinzel',serif;font-size:.9rem;color:var(--text);margin-bottom:.4rem;line-height:1.4;}
+  .video-src{font-size:.72rem;color:var(--text3);}
+
+  .state-box{grid-column:1/-1;text-align:center;padding:4rem 2rem;border:2px dashed var(--border);border-radius:16px;}
+  .empty-icon{font-size:3rem;margin-bottom:1rem;opacity:.5;}
+  .state-box h3{font-family:'Cinzel',serif;color:var(--text2);margin-bottom:.5rem;}
+  .state-box p{color:var(--text3);font-size:.9rem;line-height:1.7;}
+  .error-box{border-color:rgba(200,60,60,.4);background:rgba(200,60,60,.08);}
+  .error-box h3{color:#E08080;}
+  .error-box p{color:#C09090;}
+
+  .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 1rem;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .search-container{padding:2rem;max-width:900px;margin:0 auto;}
+  #searchHeader{font-family:'Cinzel',serif;color:var(--gold);font-size:1.1rem;margin-bottom:1.5rem;}
+  .search-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;margin-bottom:.7rem;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:1rem;}
+  .search-item:hover{border-color:var(--border2);background:var(--navy3);}
+  .si-icon{font-size:1.4rem;flex-shrink:0;}
+  .si-name{font-family:'Cinzel',serif;font-size:.95rem;color:var(--text);margin-bottom:.2rem;}
+  .si-meta{font-size:.75rem;color:var(--text3);}
+
+  ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}::-webkit-scrollbar-thumb:hover{background:var(--gold-dk);}
+
+  @media(max-width:600px){
+    header{padding:0 1rem;}.hdr-search{max-width:160px;}
+    .books-container,.chapters-container,.videos-container{padding:0 1rem 3rem;}
+    .books-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
+    .chapters-grid{grid-template-columns:repeat(auto-fill,minmax(75px,1fr));}
+    .videos-grid{grid-template-columns:1fr;}
+    .hero h1{font-size:2.2rem;}.hero-stats{gap:2rem;}
+  }
+</style>
+</head>
+<body>
+
+<div id="configBanner">
+  ⚠️ <strong>Turso not configured.</strong> Open this file and fill in TURSO_URL and TURSO_TOKEN at the top.
+</div>
+
+<header>
+  <div class="logo" onclick="goHome()">✝ Video<span>Bible</span></div>
+  <div class="hdr-search">
+    <span style="color:var(--text3);flex-shrink:0">🔍</span>
+    <input type="text" id="globalSearch" placeholder="Search books, genres…" oninput="handleSearch(this.value)">
+  </div>
+</header>
+
+<!-- HOME -->
+<div class="page active" id="page-home">
+  <div class="hero">
+    <div class="hero-cross">✝</div>
+    <h1>VideoBible</h1>
+    <p class="hero-tag">The Living Word in Motion</p>
+    <div class="divider"></div>
+    <p class="hero-desc">Explore every book and chapter of the Holy Bible through the power of video. A growing catalogue of teachings, documentaries and studies — accessible from anywhere in the world.</p>
+    <div class="hero-stats">
+      <div class="stat"><span class="num">66</span><span class="lbl">Books</span></div>
+      <div class="stat"><span class="num">1,189</span><span class="lbl">Chapters</span></div>
+      <div class="stat"><span class="num" id="heroVideoCount">—</span><span class="lbl">Videos</span></div>
+    </div>
+    <button class="btn-hero" onclick="filterTestament('OT')">📖 Browse the Bible</button>
+  </div>
+</div>
+
+<!-- BOOKS -->
+<div class="page" id="page-books">
+  <div class="page-head">
+    <div class="breadcrumb">
+      <span class="bc-link" onclick="goHome()">Home</span>
+      <span style="color:var(--text3)">›</span><span>Books</span>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-OT"  onclick="filterTestament('OT')">Old Testament</button>
+      <button class="tab-btn"        id="tab-NT"  onclick="filterTestament('NT')">New Testament</button>
+      <button class="tab-btn"        id="tab-ALL" onclick="filterTestament('ALL')">All Books</button>
+    </div>
+  </div>
+  <div class="books-container" id="booksGrid"></div>
+</div>
+
+<!-- CHAPTERS -->
+<div class="page" id="page-chapters">
+  <div class="page-head">
+    <div class="breadcrumb">
+      <span class="bc-link" onclick="goHome()">Home</span>
+      <span style="color:var(--text3)">›</span>
+      <span class="bc-link" onclick="filterTestament(currentTab)">Books</span>
+      <span style="color:var(--text3)">›</span>
+      <span id="bc-book">—</span>
+    </div>
+  </div>
+  <div class="chapters-container">
+    <div class="book-banner" id="bookInfoBanner"></div>
+    <div class="chapters-grid" id="chaptersGrid"></div>
+  </div>
+</div>
+
+<!-- VIDEOS -->
+<div class="page" id="page-videos">
+  <div class="page-head">
+    <div class="breadcrumb">
+      <span class="bc-link" onclick="goHome()">Home</span>
+      <span style="color:var(--text3)">›</span>
+      <span class="bc-link" onclick="filterTestament(currentTab)">Books</span>
+      <span style="color:var(--text3)">›</span>
+      <span class="bc-link" id="bc-book2" onclick="goToCurrentBook()">—</span>
+      <span style="color:var(--text3)">›</span>
+      <span id="bc-chapter">—</span>
+    </div>
+  </div>
+  <div class="videos-container">
+    <div class="chapter-header">
+      <div id="videoPageTitle">—</div>
+      <div id="videoPageSub">—</div>
+    </div>
+    <div class="videos-grid" id="videosGrid"></div>
+  </div>
+</div>
+
+<!-- SEARCH -->
+<div class="page" id="page-search">
+  <div class="page-head">
+    <div class="breadcrumb">
+      <span class="bc-link" onclick="goHome()">Home</span>
+      <span style="color:var(--text3)">›</span><span>Search</span>
+    </div>
+  </div>
+  <div class="search-container">
+    <p id="searchHeader">Results</p>
+    <div id="searchList"></div>
+  </div>
+</div>
+
+</body>
+</html>
