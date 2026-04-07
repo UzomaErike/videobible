@@ -231,7 +231,20 @@ function renderVideos(rows) {
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  // Hide footer on donate page (it has its own back button), show on all others
+  document.querySelector('.site-footer').style.display =
+    id === 'page-donate' ? 'none' : 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function openDonatePage() {
+  // Remember which page the user came from so we can go back
+  window._prevPage = document.querySelector('.page.active')?.id || 'page-home';
+  showPage('page-donate');
+}
+
+function closeDonatePage() {
+  showPage(window._prevPage || 'page-home');
 }
 
 function goHome() {
@@ -304,42 +317,12 @@ function openBook(bookId) {
 // ── VIDEOS ───────────────────────────────────────────────────────
 function openChapter(ch) {
   currentChapter = ch;
-  document.getElementById('bc-chapter').textContent     = 'Chapter ' + ch;
-  document.getElementById('videoPageTitle').textContent  = currentBook.name + ' — Chapter ' + ch;
-  document.getElementById('videoPageSub').textContent    =
+  document.getElementById('bc-chapter').textContent    = 'Chapter ' + ch;
+  document.getElementById('videoPageTitle').textContent = currentBook.name + ' — Chapter ' + ch;
+  document.getElementById('videoPageSub').textContent   =
     (currentBook.testament === 'OT' ? 'Old' : 'New') + ' Testament · ' + currentBook.genre;
-  updateChapterNav(ch);
   showPage('page-videos');
   loadChapterVideos(currentBook.id, ch);
-}
-
-function updateChapterNav(ch) {
-  const total   = currentBook.chapters;
-  const hasPrev = ch > 1;
-  const hasNext = ch < total;
-
-  const prevBtn = document.getElementById('navPrev');
-  const nextBtn = document.getElementById('navNext');
-
-  // Previous button
-  if (hasPrev) {
-    prevBtn.style.display = 'flex';
-    prevBtn.querySelector('.nav-label').textContent = 'Previous';
-    prevBtn.querySelector('.nav-chapter').textContent = 'Chapter ' + (ch - 1);
-    prevBtn.onclick = () => openChapter(ch - 1);
-  } else {
-    prevBtn.style.display = 'none';
-  }
-
-  // Next button
-  if (hasNext) {
-    nextBtn.style.display = 'flex';
-    nextBtn.querySelector('.nav-label').textContent = 'Next';
-    nextBtn.querySelector('.nav-chapter').textContent = 'Chapter ' + (ch + 1);
-    nextBtn.onclick = () => openChapter(ch + 1);
-  } else {
-    nextBtn.style.display = 'none';
-  }
 }
 
 // ── SEARCH ───────────────────────────────────────────────────────
@@ -492,16 +475,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   .si-name{font-family:'Cinzel',serif;font-size:.95rem;color:var(--text);margin-bottom:.2rem;}
   .si-meta{font-size:.75rem;color:var(--text3);}
 
-  /* CHAPTER NAV */
-  .chapter-nav{display:flex;gap:1rem;margin-top:3rem;padding-top:2rem;border-top:1px solid var(--border);}
-  .nav-btn{flex:1;display:none;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.5rem;cursor:pointer;transition:all .25s;text-align:left;}
-  .nav-btn:last-child{text-align:right;}
-  .nav-btn:hover{border-color:var(--border2);background:var(--navy3);transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,.35);}
-  .nav-label{font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.15em;margin-bottom:.3rem;font-family:'Cinzel',serif;}
-  .nav-chapter{font-family:'Cinzel',serif;font-size:1.05rem;color:var(--text);font-weight:600;}
-  .nav-btn:hover .nav-chapter{color:var(--gold);}
-  @media(max-width:480px){.chapter-nav{flex-direction:column;}.nav-btn:last-child{text-align:left;}}
-
   ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}::-webkit-scrollbar-thumb:hover{background:var(--gold-dk);}
 
   @media(max-width:600px){
@@ -511,6 +484,257 @@ window.addEventListener('DOMContentLoaded', async () => {
     .chapters-grid{grid-template-columns:repeat(auto-fill,minmax(75px,1fr));}
     .videos-grid{grid-template-columns:1fr;}
     .hero h1{font-size:2.2rem;}.hero-stats{gap:2rem;}
+  }
+
+  /* ── FOOTER ──────────────────────────────────────────────── */
+  .site-footer {
+    position: relative; z-index: 1;
+    border-top: 1px solid var(--border);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    background: rgba(7,9,15,.8);
+  }
+  .footer-tagline {
+    font-family: 'Cinzel', serif;
+    font-size: .75rem;
+    color: var(--text3);
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+  }
+  .btn-donate {
+    display: inline-flex;
+    align-items: center;
+    gap: .6rem;
+    background: linear-gradient(135deg, #003087, #009cde);
+    color: #fff;
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: .9rem;
+    padding: .85rem 2rem;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    letter-spacing: .06em;
+    transition: all .3s;
+    box-shadow: 0 4px 20px rgba(0,144,222,.3);
+    text-decoration: none;
+  }
+  .btn-donate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(0,144,222,.45);
+  }
+  .btn-donate .paypal-icon { font-size: 1.1rem; }
+  .footer-copy {
+    margin-top: 1.25rem;
+    font-size: .72rem;
+    color: var(--text3);
+  }
+
+  /* ── DONATE PAGE ─────────────────────────────────────────── */
+  .donate-hero {
+    text-align: center;
+    padding: 4rem 2rem 2.5rem;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .donate-cross {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+    filter: drop-shadow(0 0 24px rgba(201,168,76,.5));
+  }
+  .donate-hero h1 {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: clamp(1.8rem, 5vw, 3rem);
+    color: var(--gold);
+    line-height: 1.15;
+    margin-bottom: .5rem;
+  }
+  .donate-hero .sub {
+    font-family: 'Cinzel', serif;
+    font-size: .8rem;
+    color: var(--text3);
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    margin-bottom: 2rem;
+  }
+  .donate-divider {
+    width: 120px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    margin: 0 auto 2rem;
+  }
+  .donate-why {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem 2.5rem;
+    max-width: 680px;
+    margin: 0 auto 2.5rem;
+    text-align: left;
+  }
+  .donate-why h2 {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .donate-why p {
+    color: var(--text2);
+    font-size: .98rem;
+    line-height: 1.85;
+    margin-bottom: .85rem;
+  }
+  .donate-why p:last-child { margin-bottom: 0; }
+  .donate-why strong { color: var(--text); }
+
+  /* Impact stats */
+  .donate-impact {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    max-width: 680px;
+    margin: 0 auto 2.5rem;
+  }
+  .impact-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem 1.5rem;
+    text-align: center;
+    flex: 1;
+    min-width: 140px;
+  }
+  .impact-num {
+    font-family: 'Cinzel', serif;
+    font-size: 1.8rem;
+    color: var(--gold);
+    font-weight: 700;
+    display: block;
+  }
+  .impact-lbl {
+    font-size: .72rem;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: .12em;
+  }
+
+  /* PayPal donate button area */
+  .donate-cta {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+  .donate-cta p {
+    color: var(--text3);
+    font-size: .82rem;
+    margin-top: .85rem;
+  }
+  .donate-cta .secure-note {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .75rem;
+    color: var(--text3);
+    margin-top: .5rem;
+  }
+
+  /* Big PayPal button on donate page */
+  .btn-donate-big {
+    display: inline-flex;
+    align-items: center;
+    gap: .75rem;
+    background: linear-gradient(135deg, #003087, #0070ba, #009cde);
+    color: #fff;
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 1.1rem 3rem;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    letter-spacing: .07em;
+    text-decoration: none;
+    transition: all .3s;
+    box-shadow: 0 6px 28px rgba(0,112,186,.4);
+  }
+  .btn-donate-big:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0,112,186,.55);
+  }
+
+  /* Testimonials */
+  .donate-testimonials {
+    max-width: 680px;
+    margin: 0 auto 3rem;
+  }
+  .donate-testimonials h2 {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    font-size: 1rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 1.25rem;
+  }
+  .testimonial-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold);
+    border-radius: 12px;
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 1rem;
+    position: relative;
+  }
+  .testimonial-card::before {
+    content: '\201C';
+    position: absolute;
+    top: .5rem; left: 1rem;
+    font-size: 3.5rem;
+    color: var(--gold);
+    opacity: .2;
+    font-family: Georgia, serif;
+    line-height: 1;
+  }
+  .testimonial-text {
+    color: var(--text2);
+    font-size: .97rem;
+    line-height: 1.75;
+    font-style: italic;
+    margin-bottom: .75rem;
+    padding-left: .5rem;
+  }
+  .testimonial-author {
+    font-family: 'Cinzel', serif;
+    font-size: .78rem;
+    color: var(--gold);
+    letter-spacing: .08em;
+  }
+
+  /* Back link on donate page */
+  .donate-back {
+    text-align: center;
+    padding-bottom: 3rem;
+  }
+  .donate-back button {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text3);
+    font-family: 'Cinzel', serif;
+    font-size: .78rem;
+    padding: .5rem 1.2rem;
+    cursor: pointer;
+    letter-spacing: .05em;
+    transition: all .2s;
+  }
+  .donate-back button:hover { border-color: var(--border2); color: var(--text); }
+
+  @media(max-width:500px){
+    .donate-why { padding: 1.5rem 1.25rem; }
+    .btn-donate-big { font-size: .9rem; padding: .9rem 2rem; }
   }
 </style>
 </head>
@@ -597,18 +821,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       <div id="videoPageSub">—</div>
     </div>
     <div class="videos-grid" id="videosGrid"></div>
-
-    <!-- Previous / Next chapter navigation -->
-    <div class="chapter-nav">
-      <button class="nav-btn" id="navPrev">
-        <span class="nav-label">Previous</span>
-        <span class="nav-chapter"></span>
-      </button>
-      <button class="nav-btn" id="navNext">
-        <span class="nav-label">Next</span>
-        <span class="nav-chapter"></span>
-      </button>
-    </div>
   </div>
 </div>
 
@@ -625,6 +837,120 @@ window.addEventListener('DOMContentLoaded', async () => {
     <div id="searchList"></div>
   </div>
 </div>
+
+<!-- ══ FOOTER (appears on all pages) ════════════════════════════ -->
+<footer class="site-footer">
+  <p class="footer-tagline">The Living Word in Motion</p>
+  <button class="btn-donate" onclick="openDonatePage()">
+    <span class="paypal-icon">🙏</span>
+    Become a Video Bible Maker
+  </button>
+  <p class="footer-copy">© VideoBible · All rights reserved</p>
+</footer>
+
+<!-- ══ DONATE PAGE ══════════════════════════════════════════════ -->
+<div class="page" id="page-donate">
+
+  <!-- Hero -->
+  <div class="donate-hero">
+    <div class="donate-cross">✝</div>
+    <h1>Become a Video Bible Maker</h1>
+    <p class="sub">Help us bring God's Word to the world</p>
+    <div class="donate-divider"></div>
+  </div>
+
+  <!-- Why we need funds -->
+  <div class="donate-why">
+    <h2>📖 Why Your Support Matters</h2>
+    <p>
+      VideoBible exists to make Scripture accessible to every person on earth — in the most
+      engaging and life-giving way possible. Every chapter you watch represents hours of
+      careful curation, production, and publishing.
+    </p>
+    <p>
+      <strong>Your donation directly funds the creation of more videos.</strong>
+      Each contribution helps us cover the cost of video production, licensing,
+      hosting, and the dedicated team working to bring every one of the Bible's
+      1,189 chapters to life on screen.
+    </p>
+    <p>
+      Whether you give $5 or $500 — every gift moves us one chapter closer to
+      completing the full Video Bible for generations to come.
+    </p>
+  </div>
+
+  <!-- Impact stats -->
+  <div class="donate-impact">
+    <div class="impact-card">
+      <span class="impact-num">66</span>
+      <span class="impact-lbl">Books of the Bible</span>
+    </div>
+    <div class="impact-card">
+      <span class="impact-num">1,189</span>
+      <span class="impact-lbl">Chapters to film</span>
+    </div>
+    <div class="impact-card">
+      <span class="impact-num">∞</span>
+      <span class="impact-lbl">Lives to transform</span>
+    </div>
+  </div>
+
+  <!-- PayPal donate CTA -->
+  <div class="donate-cta">
+    <a
+      href="https://www.paypal.com/donate/?hosted_button_id=YOUR_PAYPAL_BUTTON_ID"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="btn-donate-big"
+    >
+      <img
+        src="https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_37x23.jpg"
+        alt="PayPal"
+        style="height:22px;border-radius:3px;"
+      >
+      Donate with PayPal
+    </a>
+    <br>
+    <span class="secure-note">🔒 Secure · Fast · Any amount welcome</span>
+    <p>You will be taken to PayPal's secure checkout to complete your gift.</p>
+  </div>
+
+  <!-- Testimonials -->
+  <div class="donate-testimonials">
+    <h2>✦ What People Are Saying ✦</h2>
+
+    <div class="testimonial-card">
+      <p class="testimonial-text">
+        With humble tears…thank you! The Video Bible is perfectly timed.
+        The world needs it more than ever!
+      </p>
+      <div class="testimonial-author">— Judi P.</div>
+    </div>
+
+    <div class="testimonial-card">
+      <p class="testimonial-text">
+        There is something about being able to "watch and read" that is truly
+        life altering and feeds my soul.
+      </p>
+      <div class="testimonial-author">— Adriana G.</div>
+    </div>
+
+    <div class="testimonial-card">
+      <p class="testimonial-text">
+        The Video Bible brings my imagination to life. It has me meditating on
+        God like never before.
+      </p>
+      <div class="testimonial-author">— William D.</div>
+    </div>
+  </div>
+
+  <!-- Back button -->
+  <div class="donate-back">
+    <button onclick="closeDonatePage()">← Back to VideoBible</button>
+  </div>
+
+</div>
+<!-- End Donate Page -->
 
 </body>
 </html>
