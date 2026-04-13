@@ -137,32 +137,34 @@ let globalTotal    = 0;
 
 // ── LOAD BOOK VIDEO COUNTS ───────────────────────────────────────
 // ── LOAD BOOK VIDEO COUNTS + COVERED CHAPTERS ─────────────────────
+// ── LOAD COUNTS: Unique Chapters Covered (Global + Per Book) ─────
 async function loadAllCounts() {
   if (!CONFIGURED) return;
   try {
-    // 1. Keep the original per-book video counts (so book badges still show total videos per book)
-    const videoRows = await tursoQuery(
-      "SELECT book_id, COUNT(*) as cnt FROM videos GROUP BY book_id"
-    );
-
-    bookCounts = {};
-    videoRows.forEach(r => {
-      bookCounts[r.book_id] = parseInt(r.cnt) || 0;
-    });
-
-    // 2. NEW: Count distinct chapters that have ≥1 video (this becomes the global total)
+    // Get total unique (book_id, chapter) pairs across the whole Bible
     const coveredRows = await tursoQuery(`
       SELECT COUNT(*) as total_covered
       FROM (
-        SELECT DISTINCT book_id, chapter
+        SELECT DISTINCT book_id, chapter 
         FROM videos
       )
     `);
 
     globalTotal = parseInt(coveredRows[0]?.total_covered || 0);
-
-    // Update hero counter
     document.getElementById('heroVideoCount').textContent = globalTotal.toLocaleString();
+
+    // Get unique chapters covered PER BOOK
+    const bookRows = await tursoQuery(`
+      SELECT book_id, COUNT(DISTINCT chapter) as chapter_count 
+      FROM videos 
+      GROUP BY book_id
+    `);
+
+    bookCounts = {};
+    bookRows.forEach(r => {
+      bookCounts[r.book_id] = parseInt(r.chapter_count) || 0;
+    });
+
   } catch(e) {
     console.warn("loadAllCounts failed:", e.message);
   }
@@ -818,7 +820,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     <div class="hero-stats">
       <div class="stat"><span class="num">66</span><span class="lbl">Books</span></div>
       <div class="stat"><span class="num">1,189</span><span class="lbl">Chapters</span></div>
-      <div class="stat"><span class="num" id="heroVideoCount">—</span><span class="lbl">Videos</span></div>
+      <div class="stat"><span class="num" id="heroVideoCount">—</span><span class="lbl">Chapters with Video</span></div>
     </div>
     <button class="btn-hero" onclick="filterTestament('OT')">📖 Browse the Bible</button>
   </div>
