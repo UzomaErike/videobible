@@ -526,6 +526,31 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}::-webkit-scrollbar-thumb:hover{background:var(--gold-dk);}
 
+
+/* App Store Buttons */
+.app-store-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 1.2rem 0;
+  flex-wrap: wrap;
+}
+
+.store-btn {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.store-btn:hover {
+  transform: scale(1.05);
+}
+
+.store-btn img {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+  
+  
   /* CHAPTER NAV */
   .chapter-nav{display:flex;gap:1rem;margin-top:3rem;padding-top:2rem;border-top:1px solid var(--border);}
   .nav-btn{flex:1;display:none;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.5rem;cursor:pointer;transition:all .25s;text-align:left;}
@@ -543,6 +568,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     .chapters-grid{grid-template-columns:repeat(auto-fill,minmax(75px,1fr));}
     .videos-grid{grid-template-columns:1fr;}
     .hero h1{font-size:2.2rem;}.hero-stats{gap:2rem;}
+
+
+    .app-store-buttons {
+  gap: 10px;
+}
+.store-btn img {
+  height: 40px;
+}
+    
   }
 
   /* ── FOOTER ──────────────────────────────────────────────── */
@@ -916,6 +950,29 @@ window.addEventListener('DOMContentLoaded', async () => {
     <span class="paypal-icon">🙏</span>
     Become a Video Bible Maker
   </button>
+
+<!-- App Store Buttons -->
+  <div class="app-store-buttons">
+    <a href="https://apps.apple.com/app/your-app-id" 
+       target="_blank" 
+       rel="noopener noreferrer"
+       class="store-btn apple-btn">
+      <img src="https://purati.com/wp-content/uploads/2023/10/apple-BANNER.png" 
+           alt="Download on the App Store" 
+           height="45">
+    </a>
+    
+    <a href="https://play.google.com/store/apps/details?id=your.package.name" 
+       target="_blank" 
+       rel="noopener noreferrer"
+       class="store-btn google-btn">
+      <img src="https://static.vecteezy.com/system/resources/thumbnails/012/871/364/small_2x/google-play-store-download-button-in-white-colors-download-on-the-google-play-store-free-png.png" 
+           alt="Get it on Google Play" 
+           height="45">
+    </a>
+  </div>
+
+  
   <p class="footer-copy">© VideoBible · All rights reserved</p>
 </footer>
 
