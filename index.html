@@ -262,6 +262,11 @@ function openDonatePage() {
   showPage('page-donate');
 }
 
+// ── CONTACT US ───────────────────────────────────────────────────
+function contactUs() {
+  window.location.href = "mailto:videobible.watch@gmail.com?subject=VideoBible%20Inquiry&body=Hello%20VideoBible%20team,";
+}  
+
 function closeDonatePage() {
   showPage(window._prevPage || 'page-home');
 }
@@ -526,7 +531,31 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}::-webkit-scrollbar-thumb:hover{background:var(--gold-dk);}
 
+/* Contact Us Button */
+.contact-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Cinzel', serif;
+  font-size: 0.95rem;
+  padding: 0.75rem 2rem;
+  border-radius: 50px;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  transition: all 0.3s;
+  margin-bottom: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
 
+.contact-btn:hover {
+  background: rgba(201, 168, 76, 0.1);
+  border-color: var(--gold);
+  color: var(--gold);
+  transform: translateY(-2px);
+}
+  
 /* App Store Buttons */
 .app-store-buttons {
   display: flex;
@@ -945,7 +974,12 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 <!-- ══ FOOTER (appears on all pages) ════════════════════════════ -->
 <footer class="site-footer">
-  <p class="footer-tagline">The Living Word in Motion</p>
+  
+  <!-- Contact Us Button -->
+  <button onclick="contactUs()" class="contact-btn">
+    ✉️ Contact Us
+  </button>
+  
   <button class="btn-donate" onclick="openDonatePage()">
     <span class="paypal-icon">🙏</span>
     Become a Video Bible Maker
