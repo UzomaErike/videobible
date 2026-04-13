@@ -136,17 +136,32 @@ let bookCounts     = {};
 let globalTotal    = 0;
 
 // ── LOAD BOOK VIDEO COUNTS ───────────────────────────────────────
+// ── LOAD BOOK VIDEO COUNTS + COVERED CHAPTERS ─────────────────────
 async function loadAllCounts() {
   if (!CONFIGURED) return;
   try {
-    const rows = await tursoQuery(
+    // 1. Keep the original per-book video counts (so book badges still show total videos per book)
+    const videoRows = await tursoQuery(
       "SELECT book_id, COUNT(*) as cnt FROM videos GROUP BY book_id"
     );
-    bookCounts = {}; globalTotal = 0;
-    rows.forEach(r => {
+
+    bookCounts = {};
+    videoRows.forEach(r => {
       bookCounts[r.book_id] = parseInt(r.cnt) || 0;
-      globalTotal += bookCounts[r.book_id];
     });
+
+    // 2. NEW: Count distinct chapters that have ≥1 video (this becomes the global total)
+    const coveredRows = await tursoQuery(`
+      SELECT COUNT(*) as total_covered
+      FROM (
+        SELECT DISTINCT book_id, chapter
+        FROM videos
+      )
+    `);
+
+    globalTotal = parseInt(coveredRows[0]?.total_covered || 0);
+
+    // Update hero counter
     document.getElementById('heroVideoCount').textContent = globalTotal.toLocaleString();
   } catch(e) {
     console.warn("loadAllCounts failed:", e.message);
